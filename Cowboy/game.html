@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>COWBOY</title>
+<title>COWS AND BOYS</title>
 <style>
  :root { --ink:#2b1d16; --sand:#e8c98f; --sage:#8a9a5b; --sky:#c46a3a; }
  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -36,10 +36,32 @@
  #toast { position:fixed; left:50%; top:16%; transform:translateX(-50%); z-index:7; pointer-events:none;
  color:#ffe9b0; font-weight:bold; font-size:18px; letter-spacing:2px; text-shadow:2px 2px 0 #2b1d16;
  opacity:0; transition:opacity .25s; }
+ #nameEntry { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center;
+ justify-content:center; background:rgba(26,18,16,.97); padding:24px; text-align:center; }
+ #nameEntry h1 { font-size:clamp(36px,10vw,72px); letter-spacing:6px; color:#e8c98f;
+ text-shadow:4px 4px 0 #7a3b1e,8px 8px 0 #2b1d16; margin-bottom:8px; }
+ #nameEntry .sub { font-size:13px; letter-spacing:3px; color:#c46a3a; margin-bottom:28px; }
+ #nameEntry input { font-family:inherit; font-size:22px; text-align:center; letter-spacing:3px;
+ color:#f3e3c3; background:rgba(43,29,22,.9); border:2px solid #5a4030; border-radius:6px;
+ padding:12px 20px; width:min(280px,80vw); margin-bottom:20px; outline:none; }
+ #nameEntry input::placeholder { color:#5a4030; }
+ #nameEntry button { font-family:inherit; font-size:18px; font-weight:bold; letter-spacing:2px;
+ padding:14px 34px; background:#c46a3a; color:#fff; border:3px solid #f3e3c3; border-radius:6px;
+ box-shadow:0 4px 0 #2b1d16; cursor:pointer; }
+ .profile-bar { font-size:12px; letter-spacing:2px; color:#a08060; margin-bottom:10px; }
+ .unlock-badge { font-size:12px; color:#e8c98f; background:rgba(196,106,58,.3); border:1px solid #c46a3a;
+ border-radius:4px; padding:4px 10px; margin-bottom:16px; letter-spacing:1px; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+
+<div id="nameEntry" class="hidden">
+ <h1>COWS &amp;<br>BOYS</h1>
+ <div class="sub">WHAT'S YOUR NAME, COWBOY?</div>
+ <input id="nameInput" type="text" maxlength="16" placeholder="YOUR NAME" autocomplete="off" autocorrect="off" spellcheck="false">
+ <button id="nameSubmitBtn">HIT THE TRAIL</button>
+</div>
 
 <div class="hud">
  <span class="pill" id="hudHerd">🐄 0</span>
@@ -50,8 +72,10 @@
 <div id="toast"></div>
 
 <div class="overlay" id="menu">
- <h1>COWBOY</h1>
+ <h1>COWS &amp;<br>BOYS</h1>
  <div class="sub">KEEP THE HERD MOVIN'</div>
+ <div id="profileBar" class="profile-bar"></div>
+ <div id="unlockBadge" class="unlock-badge hidden"></div>
  <div class="card">
  The trail scrolls up — any cow that falls off the bottom is <b>lost</b>.<br><br>
  <b>Move:</b> touch &amp; drag.<br>
@@ -69,6 +93,8 @@
  <div class="big" id="goScore">0</div>
  <div class="sub">SCORE</div>
  <div class="card" id="goStats"></div>
+ <div id="goLifetime" class="profile-bar" style="margin-bottom:16px;"></div>
+ <div id="goUnlock" class="unlock-badge hidden" style="margin-bottom:16px;"></div>
  <button id="retryBtn">RIDE AGAIN</button>
 </div>
 
@@ -96,6 +122,56 @@ const toastEl = document.getElementById('toast');
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx*dx + dy*dy; };
+
+// ============================== PROFILE ==============================
+const UNLOCK_SCORE = 300;
+const profile = {
+  get name() { return localStorage.getItem('cb_name') || ''; },
+  set name(v) { localStorage.setItem('cb_name', v); },
+  get lifetime() { return parseFloat(localStorage.getItem('cb_lifetime') || '0'); },
+  addScore(s) { localStorage.setItem('cb_lifetime', (this.lifetime + s).toFixed(1)); },
+  get unlocked() { return this.lifetime >= UNLOCK_SCORE; },
+  get startingLassos() { return this.unlocked ? 3 : 2; },
+  get startingCows() { return this.unlocked ? 9 : 8; },
+};
+
+function updateProfileUI() {
+  const bar = document.getElementById('profileBar');
+  const badge = document.getElementById('unlockBadge');
+  if (profile.name) {
+    bar.textContent = `${profile.name.toUpperCase()} · LIFETIME ${Math.floor(profile.lifetime)}`;
+  }
+  if (profile.unlocked) {
+    badge.textContent = '🏅 TRAIL LEGEND — +1 LASSO · BONUS COW';
+    badge.classList.remove('hidden');
+  } else {
+    const needed = Math.ceil(UNLOCK_SCORE - profile.lifetime);
+    badge.textContent = `${needed} MORE TO UNLOCK TRAIL LEGEND`;
+    badge.classList.remove('hidden');
+  }
+}
+
+function initProfile() {
+  if (!profile.name) {
+    document.getElementById('nameEntry').classList.remove('hidden');
+    document.getElementById('menu').classList.add('hidden');
+    const input = document.getElementById('nameInput');
+    const submit = document.getElementById('nameSubmitBtn');
+    const doSubmit = () => {
+      const n = input.value.trim();
+      if (!n) { input.focus(); return; }
+      profile.name = n;
+      document.getElementById('nameEntry').classList.add('hidden');
+      document.getElementById('menu').classList.remove('hidden');
+      updateProfileUI();
+    };
+    submit.addEventListener('click', doSubmit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
+    input.focus();
+  } else {
+    updateProfileUI();
+  }
+}
 
 // ============================== STATE ==============================
 const S = {
@@ -565,11 +641,12 @@ function loop(ts) {
 function startGame() {
  S.running = true; S.t = 0; S.score = 0; S.camY = -H; S.scrollSpeed = 26;
  S.cows = []; S.wolves = []; S.features = []; S.pickups = []; S.parts = [];
- S.lassoCharges = 0; S.boostT = 0; S.cowsLost = 0; S.wolvesRepelled = 0; S._wolfT = 0;
+ S.lassoCharges = profile.startingLassos;
+ S.boostT = 0; S.cowsLost = 0; S.wolvesRepelled = 0; S._wolfT = 0;
  S.nextFeatureY = -H * 1.6;
  S.player = makePlayer();
  S.player.y = -H * .35;
- for (let i = 0; i < 8; i++)
+ for (let i = 0; i < profile.startingCows; i++)
  S.cows.push(makeCow(W/2 + rand(-70, 70), -H * .5 + rand(-50, 50)));
  updateLassoBtn();
  document.getElementById('menu').classList.add('hidden');
@@ -580,17 +657,42 @@ function startGame() {
 
 function endGame() {
  S.running = false;
- document.getElementById('goScore').textContent = Math.floor(S.score);
+ const runScore = Math.floor(S.score);
+ const wasUnlocked = profile.unlocked;
+ profile.addScore(runScore);
+ const nowUnlocked = profile.unlocked;
+
+ document.getElementById('goScore').textContent = runScore;
  document.getElementById('goStats').innerHTML =
  `Time on the trail: <b>${Math.floor(S.t)}s</b><br>` +
  `Cattle lost: <b>${S.cowsLost}</b><br>` +
  `Wolves run off: <b>${S.wolvesRepelled}</b>`;
+
+ const lifeEl = document.getElementById('goLifetime');
+ lifeEl.textContent = `${profile.name ? profile.name.toUpperCase() + ' · ' : ''}LIFETIME ${Math.floor(profile.lifetime)}`;
+
+ const unlockEl = document.getElementById('goUnlock');
+ if (!wasUnlocked && nowUnlocked) {
+   unlockEl.textContent = '🏅 TRAIL LEGEND UNLOCKED — +1 LASSO · BONUS COW!';
+   unlockEl.classList.remove('hidden');
+ } else if (nowUnlocked) {
+   unlockEl.textContent = '🏅 TRAIL LEGEND — +1 LASSO · BONUS COW ACTIVE';
+   unlockEl.classList.remove('hidden');
+ } else {
+   const needed = Math.ceil(UNLOCK_SCORE - profile.lifetime);
+   unlockEl.textContent = `${needed} MORE TO UNLOCK TRAIL LEGEND`;
+   unlockEl.classList.remove('hidden');
+ }
+
  document.getElementById('gameover').classList.remove('hidden');
  lassoBtn.style.display = 'none';
+ updateProfileUI();
 }
 
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
+
+initProfile();
 </script>
 </body>
 </html>
