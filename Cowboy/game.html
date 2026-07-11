@@ -372,8 +372,10 @@ function update(dt) {
 
 // ============================== RENDER ==============================
 function draw() {
+ // prairie ground
  ctx.fillStyle = '#caa96a';
  ctx.fillRect(0, 0, W, H);
+ // subtle ground stripes tied to world y for scroll feel
  ctx.fillStyle = 'rgba(160,125,70,.25)';
  const off = ((-S.camY) % 80 + 80) % 80;
  for (let y = -80 + off; y < H; y += 80) ctx.fillRect(0, y, W, 30);
@@ -461,56 +463,81 @@ function draw() {
  ctx.globalAlpha = 1;
  }
 
+ // ---- cows ----
  for (const c of S.cows) {
  const cy = sy(c.y), bo = Math.sin(c.bob) * 1.5;
+ // shadow
  ctx.fillStyle = 'rgba(60,40,20,.25)';
  ctx.beginPath(); ctx.ellipse(c.x, cy + 10, 12, 4, 0, 0, 7); ctx.fill();
+ // body
  ctx.fillStyle = c.tint;
  ctx.fillRect(c.x - 11, cy - 7 + bo, 22, 14);
+ // patches
  ctx.fillStyle = c.tint === '#c9b8a0' ? '#4a3628' : '#c9b8a0';
  ctx.fillRect(c.x - 6, cy - 5 + bo, 6, 6);
  ctx.fillRect(c.x + 3, cy + 1 + bo, 5, 5);
+ // head
  ctx.fillStyle = '#4a3628';
  const hd = c.vx >= 0 ? 1 : -1;
  ctx.fillRect(c.x + hd * 9, cy - 9 + bo, 8, 8);
- ctx.fillStyle = '#f3e3c3';
- ctx.fillRect(c.x + hd * 10, cy - 13 + bo, 2, 5);
- ctx.fillRect(c.x + hd * 14, cy - 13 + bo, 2, 5);
- if (c.eating) {
- ctx.fillStyle = '#5a9a3a'; ctx.font = '10px serif';
- ctx.textAlign = 'center'; ctx.fillText('🌿', c.x, cy - 18 + bo);
- }
+ // horns
+ ctx.fillStyle = '#e8dcc0';
+ ctx.fillRect(c.x + hd * 9 - 2, cy - 11 + bo, 3, 3);
+ ctx.fillRect(c.x + hd * 15, cy - 11 + bo, 3, 3);
+ // eating indicator
+ if (c.eating) { ctx.fillStyle = '#6d7d45'; ctx.font = '10px monospace'; ctx.textAlign='center';
+ ctx.fillText('nom', c.x, cy - 16); }
+ if (c.panic > 0) { ctx.fillStyle = '#c43a2a'; ctx.font = 'bold 12px monospace'; ctx.textAlign='center';
+ ctx.fillText('!', c.x, cy - 16); }
  }
 
+ // ---- wolves ----
  for (const w of S.wolves) {
  const wy = sy(w.y);
- ctx.fillStyle = w.state === 'flee' ? '#a0a0b0' : '#4a3040';
- ctx.beginPath(); ctx.ellipse(w.x, wy, 12, 8, 0, 0, 7); ctx.fill();
- ctx.fillStyle = '#6a5060';
- ctx.fillRect(w.x - 4, wy - 12, 4, 8);
- ctx.fillRect(w.x + 2, wy - 11, 4, 7);
- ctx.fillStyle = '#ff4040';
- ctx.fillRect(w.x - 2, wy - 2, 3, 2);
+ ctx.fillStyle = 'rgba(40,30,25,.3)';
+ ctx.beginPath(); ctx.ellipse(w.x, wy + 9, 11, 3.5, 0, 0, 7); ctx.fill();
+ ctx.fillStyle = w.state === 'flee' ? '#7d7d85' : '#55555f';
+ ctx.fillRect(w.x - 10, wy - 5, 20, 11);
+ const whd = w.vx >= 0 ? 1 : -1;
+ ctx.fillRect(w.x + whd * 8, wy - 8, 8, 7); // head
+ ctx.fillRect(w.x + whd * 10, wy - 11, 3, 4); // ear
+ ctx.fillRect(w.x - whd * 13, wy - 7, 5, 4); // tail
+ ctx.fillStyle = '#c43a2a';
+ ctx.fillRect(w.x + whd * 12, wy - 6, 2, 2); // eye
  }
 
- // player
- const P = S.player;
- const py = sy(P.y);
+ // ---- lasso animation ----
+ if (lassoAnim && lassoAnim.cow) {
+ const Pl = S.player, cl = lassoAnim.cow;
+ ctx.strokeStyle = '#e8c98f'; ctx.lineWidth = 3;
+ ctx.beginPath();
+ ctx.moveTo(Pl.x, sy(Pl.y));
+ ctx.quadraticCurveTo((Pl.x + cl.x)/2, sy(Math.min(Pl.y, cl.y)) - 60 * (1 - lassoAnim.t), cl.x, sy(cl.y));
+ ctx.stroke();
+ ctx.beginPath(); ctx.arc(cl.x, sy(cl.y), 18 * (1 - lassoAnim.t) + 6, 0, 7); ctx.stroke();
+ }
+
+ // ---- player (cowboy on horse) ----
+ const P = S.player, py = sy(P.y), g = Math.sin(P.gallop) * 2;
+ ctx.fillStyle = 'rgba(60,40,20,.3)';
+ ctx.beginPath(); ctx.ellipse(P.x, py + 13, 14, 4, 0, 0, 7); ctx.fill();
  const f = P.face;
- const g = Math.sin(P.gallop) * 3;
- ctx.fillStyle = '#c8a06a';
- ctx.beginPath(); ctx.ellipse(P.x, py + 6, 14, 9, 0, 0, 7); ctx.fill();
- ctx.fillStyle = '#8a6040';
- ctx.fillRect(P.x - 8, py - 6 + g, 16, 10);
- ctx.fillStyle = '#5a3a20';
- ctx.fillRect(P.x + f * 8, py - 10 + g, 8, 8);
- ctx.fillStyle = '#f3e3c3';
- ctx.fillRect(P.x + f * 10, py - 16 + g, 2, 7);
- ctx.fillRect(P.x + f * 13, py - 15 + g, 2, 6);
+ // horse body
+ ctx.fillStyle = '#6d4229';
+ ctx.fillRect(P.x - 13, py - 4 + g, 26, 12);
+ // horse head + legs
+ ctx.fillRect(P.x + f * 11, py - 10 + g, 8, 10);
+ ctx.fillRect(P.x - 11, py + 7 + g, 4, 7); ctx.fillRect(P.x + 7, py + 7 + g, 4, 7);
+ // mane/tail
+ ctx.fillStyle = '#3d2317';
+ ctx.fillRect(P.x + f * 10, py - 12 + g, 4, 6);
+ ctx.fillRect(P.x - f * 15, py - 4 + g, 4, 8);
+ // rider
  ctx.fillStyle = '#3a5a8c';
  ctx.fillRect(P.x - 4, py - 15 + g, 9, 12);
  ctx.fillStyle = '#d9a066';
  ctx.fillRect(P.x - 3, py - 21 + g, 7, 6);
+ // hat
  ctx.fillStyle = '#8a5f3c';
  ctx.fillRect(P.x - 7, py - 23 + g, 15, 3);
  ctx.fillRect(P.x - 3, py - 27 + g, 7, 5);
@@ -519,20 +546,10 @@ function draw() {
  ctx.beginPath(); ctx.arc(P.x, py - 4, 24 + Math.sin(S.t*10)*3, 0, 7); ctx.stroke();
  }
 
- if (lassoAnim) {
- const cow = lassoAnim.cow;
- const progress = 1 - lassoAnim.t;
- ctx.strokeStyle = `rgba(200,160,80,${progress})`;
- ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
- ctx.beginPath(); ctx.moveTo(P.x, sy(P.y)); ctx.lineTo(cow.x, sy(cow.y)); ctx.stroke();
- ctx.setLineDash([]);
- }
-
+ // danger line at the bottom
  const grad = ctx.createLinearGradient(0, H - 60, 0, H);
- grad.addColorStop(0, 'rgba(160,50,30,0)');
- grad.addColorStop(1, 'rgba(160,50,30,.45)');
- ctx.fillStyle = grad;
- ctx.fillRect(0, H - 60, W, 60);
+ grad.addColorStop(0, 'rgba(160,50,30,0)'); grad.addColorStop(1, 'rgba(160,50,30,.45)');
+ ctx.fillStyle = grad; ctx.fillRect(0, H - 60, W, 60);
 }
 
 // ============================== GAME LOOP ==============================
