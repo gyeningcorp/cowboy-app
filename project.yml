@@ -32,6 +32,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.innercircle.cowboy
         INFOPLIST_FILE: Cowboy/Info.plist
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+        TARGETED_DEVICE_FAMILY: "1"
 
 schemes:
   Cowboy:
