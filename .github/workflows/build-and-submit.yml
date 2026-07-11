@@ -90,12 +90,17 @@ jobs:
         run: |
           IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
           echo "Uploading: $IPA"
-          xcrun altool --upload-app \
+          OUTPUT=$(xcrun altool --upload-app \
             --file "$IPA" \
             --type ios \
             --apiKey ${{ secrets.ASC_KEY_ID }} \
             --apiIssuer ${{ secrets.ASC_ISSUER_ID }} \
-            --private-key @path:/Users/runner/.private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+            --private-key @path:/Users/runner/.private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qi "UPLOAD FAILED\|error:"; then
+            echo "::error::altool upload failed"
+            exit 1
+          fi
 
       - name: Done
         if: success()
