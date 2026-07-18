@@ -1,4 +1,4 @@
-name: Build & Submit to TestFlight
+name: Build & Submit to App Store
 
 on:
   push:
@@ -86,7 +86,7 @@ jobs:
             -exportPath $RUNNER_TEMP/export \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
 
-      - name: Upload to TestFlight
+      - name: Upload to App Store Connect
         run: |
           IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
           echo "Uploading: $IPA"
@@ -102,6 +102,13 @@ jobs:
             exit 1
           fi
 
+      - name: Submit for App Store Review
+        run: node submit-for-review.js
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: /Users/runner/.private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
       - name: Done
         if: success()
-        run: echo "✅ Cowboy build $GITHUB_RUN_NUMBER uploaded to TestFlight!"
+        run: echo "✅ Cowboy build $GITHUB_RUN_NUMBER submitted for App Store review!"
