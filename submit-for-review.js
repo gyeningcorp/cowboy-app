@@ -60,6 +60,18 @@ async function main() {
   if (!build) throw new Error('Build not processed within 10 minutes');
   console.log(`✅ Build ${BUILD_NUM} ready: ${build.id}`);
 
+  // 1.5. Set export compliance on the build
+  console.log('🔒 Setting export compliance (usesNonExemptEncryption=false)...');
+  const compR = await api('PATCH', `/v1/builds/${build.id}`, {
+    data: { type:'builds', id:build.id, attributes:{ usesNonExemptEncryption:false } }
+  });
+  if (compR.status < 400) {
+    console.log('✅ Export compliance set.');
+  } else {
+    console.log('⚠️  Could not set export compliance:', JSON.stringify(compR.body));
+  }
+  await sleep(2000);
+
   // 2. Cancel existing submissions
   console.log('🧹 Cancelling existing submissions...');
   const existingR = await api('GET', `/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=IOS`);
