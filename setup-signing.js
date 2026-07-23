@@ -12,6 +12,10 @@ const BUNDLE_ID     = 'com.innercircle.cowboy';
 const TEAM_ID       = '4LZJ7U5FHS';
 const TMP           = process.env.RUNNER_TEMP || '/tmp';
 
+// Use Homebrew OpenSSL if available (avoids LibreSSL quirks on macOS runners)
+const OPENSSL = fs.existsSync('/opt/homebrew/opt/openssl@3/bin/openssl')
+  ? '/opt/homebrew/opt/openssl@3/bin/openssl' : 'openssl';
+
 function makeJWT() {
   const privKey = fs.readFileSync(ASC_KEY_PATH, 'utf8');
   const now = Math.floor(Date.now() / 1000);
@@ -61,7 +65,11 @@ async function ensureBundleId(bundleId, name) {
 
 async function createProfile(name, bundleIdResourceId, certId) {
   const existing = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(name)}`);
-  for (const p of (existing.body.data || [])) await api('DELETE', `/v1/profiles/${p.id}`);
+  for (const p of (existing.body.data || [])) {
+    if (p.attributes.name === name) {
+      await api('DELETE', `/v1/profiles/${p.id}`);
+    }
+  }
   const res = await api('POST', '/v1/profiles', {
     data: {
       type: 'profiles',
@@ -78,37 +86,55 @@ async function createProfile(name, bundleIdResourceId, certId) {
 }
 
 async function main() {
-  console.log('🔑 Generating distribution key...');
   const distKeyPath = path.join(TMP, 'dist_key.pem');
   const csrPath = path.join(TMP, 'dist.csr');
-  execSync(`openssl genrsa -out ${distKeyPath} 2048`);
-  execSync(`openssl req -new -key ${distKeyPath} -out ${csrPath} -subj "/CN=iPhone Distribution/O=Inner Circle Group/C=US"`);
-  const csrDer = execSync(`openssl req -in ${csrPath} -outform DER`);
-  const csrB64 = csrDer.toString('base64');
 
-  console.log('🧹 Removing old distribution certs...');
-  const certs = await api('GET', '/v1/certificates?filter[certificateType]=IOS_DISTRIBUTION');
-  for (const c of (certs.body.data || [])) await api('DELETE', `/v1/certificates/${c.id}`);
+  console.log('🔑 Generating distribution key and CSR...');
+  execSync(`${OPENSSL} genrsa -out ${distKeyPath} 2048`);
+  execSync(`${OPENSSL} req -new -key ${distKeyPath} -out ${csrPath} -subj "/CN=iPhone Distribution/O=Inner Circle Group/C=US"`);
+  const csrDer = execSync(`${OPENSSL} req -in ${csrPath} -outform DER`);
+  const csrB64 = csrDer.toString('base64').replace(/[\n\r]/g, '');
 
-  console.log('📜 Creating distribution certificate...');
+  // Only delete oldest cert if at the 2-cert limit — never nuke all
+  console.log('📋 Checking existing distribution certs...');
+  const certs = await api('GET', '/v1/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=20');
+  const existingCerts = certs.body.data || [];
+  console.log(`Existing IOS_DISTRIBUTION certs: ${existingCerts.length}`);
+  existingCerts.forEach(c => console.log(` - ${c.id} exp:${c.attributes.expirationDate} serial:${c.attributes.serialNumber}`));
+
+  if (existingCerts.length >= 2) {
+    const oldest = [...existingCerts].sort(
+      (a, b) => new Date(a.attributes.expirationDate) - new Date(b.attributes.expirationDate)
+    )[0];
+    console.log(`At limit — deleting oldest: ${oldest.id}`);
+    await api('DELETE', `/v1/certificates/${oldest.id}`);
+  }
+
+  console.log('📜 Creating new distribution certificate...');
   const certRes = await api('POST', '/v1/certificates', {
     data: { type:'certificates', attributes:{ certificateType:'IOS_DISTRIBUTION', csrContent:csrB64 } }
   });
   if (!certRes.body.data) throw new Error(`Cert creation failed: ${JSON.stringify(certRes.body.errors)}`);
   const certId = certRes.body.data.id;
   const certContent = certRes.body.data.attributes.certificateContent;
+  console.log(`✅ New cert: ${certId}`);
 
   const certPath = path.join(TMP, 'dist.cer');
   const p12Path = path.join(TMP, 'dist.p12');
   fs.writeFileSync(certPath, Buffer.from(certContent, 'base64'));
-  execSync(`openssl x509 -inform DER -in ${certPath} -out ${path.join(TMP, 'dist.pem')}`);
-  execSync(`openssl pkcs12 -export -inkey ${distKeyPath} -in ${path.join(TMP, 'dist.pem')} -out ${p12Path} -passout pass:cowboy123`);
+  execSync(`${OPENSSL} x509 -inform DER -in ${certPath} -out ${path.join(TMP, 'dist.pem')}`);
+  try {
+    execSync(`${OPENSSL} pkcs12 -export -legacy -inkey ${distKeyPath} -in ${path.join(TMP, 'dist.pem')} -out ${p12Path} -passout pass:cowboy123`, { stdio:'inherit' });
+  } catch {
+    execSync(`${OPENSSL} pkcs12 -export -inkey ${distKeyPath} -in ${path.join(TMP, 'dist.pem')} -out ${p12Path} -passout pass:cowboy123`, { stdio:'inherit' });
+  }
+
   execSync(`security create-keychain -p cowboy123 cowboy-build.keychain || true`);
   execSync(`security default-keychain -s cowboy-build.keychain`);
   execSync(`security unlock-keychain -p cowboy123 cowboy-build.keychain`);
   execSync(`security import ${p12Path} -k cowboy-build.keychain -P cowboy123 -A`);
   execSync(`security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k cowboy123 cowboy-build.keychain`);
-  console.log('✅ Certificate installed');
+  console.log('✅ Certificate installed in keychain');
 
   const appBundleResId = await ensureBundleId(BUNDLE_ID, 'Cowboy');
 
