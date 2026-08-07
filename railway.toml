@@ -1,6 +1,7 @@
 [build]
-buildCommand = "npm install"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "node index.js"
 healthcheckPath = "/health"
