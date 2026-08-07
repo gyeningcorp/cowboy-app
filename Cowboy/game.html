@@ -95,11 +95,40 @@
  <div class="card" id="goStats"></div>
  <div id="goLifetime" class="profile-bar" style="margin-bottom:16px;"></div>
  <div id="goUnlock" class="unlock-badge hidden" style="margin-bottom:16px;"></div>
+ <div id="goLeaderboard" style="width:100%;max-width:420px;margin-bottom:16px;display:none;">
+  <div style="font-size:11px;letter-spacing:3px;color:#c46a3a;margin-bottom:8px;">🏆 TOP RIDERS</div>
+  <div id="goLbList" style="font-size:13px;line-height:1.9;color:#f3e3c3;background:rgba(43,29,22,.8);border:2px solid #5a4030;border-radius:6px;padding:10px 14px;"></div>
+ </div>
  <button id="retryBtn">RIDE AGAIN</button>
 </div>
 
 <script>
 "use strict";
+// ============================== LEADERBOARD ==============================
+const API = 'https://cows-and-boys.up.railway.app';
+
+async function submitScore(name, score, trailTime, cowsLost, wolvesRepelled) {
+  try {
+    await fetch(`${API}/api/scores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, score, trailTime, cowsLost, wolvesRepelled })
+    });
+  } catch (_) {}
+}
+
+async function loadLeaderboard() {
+  try {
+    const res = await fetch(`${API}/api/leaderboard`);
+    const rows = await res.json();
+    const el = document.getElementById('goLbList');
+    el.innerHTML = rows.map((r, i) =>
+      `<span style="color:#c46a3a">${i + 1}.</span> ${r.name.toUpperCase().padEnd(16, ' ')} <b>${r.score}</b>`
+    ).join('<br>');
+    document.getElementById('goLeaderboard').style.display = 'block';
+  } catch (_) {}
+}
+
 // ============================== SETUP ==============================
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -685,8 +714,11 @@ function endGame() {
  }
 
  document.getElementById('gameover').classList.remove('hidden');
+ document.getElementById('goLeaderboard').style.display = 'none';
  lassoBtn.style.display = 'none';
  updateProfileUI();
+ if (profile.name) submitScore(profile.name, runScore, Math.floor(S.t), S.cowsLost, S.wolvesRepelled);
+ loadLeaderboard();
 }
 
 document.getElementById('startBtn').addEventListener('click', startGame);
