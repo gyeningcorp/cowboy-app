@@ -13,8 +13,9 @@ struct GameView: UIViewRepresentable {
         webView.isOpaque = true
         webView.backgroundColor = UIColor(red: 0.102, green: 0.071, blue: 0.063, alpha: 1)
 
-        if let url = Bundle.main.url(forResource: "game", withExtension: "html") {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        if let url = Bundle.main.url(forResource: "game", withExtension: "html"),
+           let html = try? String(contentsOf: url, encoding: .utf8) {
+            webView.loadHTMLString(html, baseURL: Bundle.main.bundleURL)
         }
         return webView
     }
