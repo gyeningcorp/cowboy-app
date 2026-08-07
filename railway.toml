@@ -1,6 +1,6 @@
 [build]
-buildCommand = "cd server && npm install"
+buildCommand = "npm install"
 
 [deploy]
-startCommand = "cd server && npm start"
+startCommand = "npm start"
 healthcheckPath = "/health"
