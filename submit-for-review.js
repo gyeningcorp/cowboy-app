@@ -9,6 +9,7 @@ const KEY_PATH   = process.env.ASC_KEY_PATH;
 const APP_ID     = '6789995023';
 const BUILD_NUM  = process.env.GITHUB_RUN_NUMBER;
 const NEW_VERSION = '1.0.1';
+const PUBLIC_BETA_GROUP_ID = 'ba702019-ed93-4ffe-aab3-9bf07da265a1';
 
 function makeJWT() {
   const privKey = fs.readFileSync(KEY_PATH, 'utf8');
@@ -60,7 +61,18 @@ async function main() {
   if (!build) throw new Error('Build not processed within 10 minutes');
   console.log(`✅ Build ${BUILD_NUM} ready: ${build.id}`);
 
-  // 1.5. Set export compliance on the build
+  // 1.5. Add to TestFlight Public Beta group (triggers beta review, auto-distributes to testers)
+  console.log('📱 Adding build to TestFlight Public Beta group...');
+  const tfR = await api('POST', `/v1/betaGroups/${PUBLIC_BETA_GROUP_ID}/relationships/builds`, {
+    data: [{ type: 'builds', id: build.id }]
+  });
+  if (tfR.status === 204 || tfR.status === 200) {
+    console.log('✅ Build added to TestFlight Public Beta group.');
+  } else {
+    console.log(`⚠️  TestFlight add status ${tfR.status}:`, JSON.stringify(tfR.body?.errors?.[0]?.detail ?? tfR.body));
+  }
+
+  // Set export compliance on the build
   console.log('🔒 Setting export compliance (usesNonExemptEncryption=false)...');
   const compR = await api('PATCH', `/v1/builds/${build.id}`, {
     data: { type:'builds', id:build.id, attributes:{ usesNonExemptEncryption:false } }
