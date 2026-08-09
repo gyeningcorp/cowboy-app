@@ -96,8 +96,8 @@
  <div id="goLifetime" class="profile-bar" style="margin-bottom:16px;"></div>
  <div id="goUnlock" class="unlock-badge hidden" style="margin-bottom:16px;"></div>
  <div id="goLeaderboard" style="width:100%;max-width:420px;margin-bottom:16px;display:none;">
-  <div style="font-size:11px;letter-spacing:3px;color:#c46a3a;margin-bottom:8px;">🏆 TOP RIDERS</div>
-  <div id="goLbList" style="font-size:13px;line-height:1.9;color:#f3e3c3;background:rgba(43,29,22,.8);border:2px solid #5a4030;border-radius:6px;padding:10px 14px;"></div>
+  <div style="font-size:11px;letter-spacing:3px;color:#c46a3a;margin-bottom:8px;">🏆 TOP RIDERS <span id="goLbYourRank" style="font-size:10px;color:#a08060;letter-spacing:1px;"></span></div>
+  <div id="goLbList" style="font-size:13px;line-height:1.9;color:#f3e3c3;background:rgba(43,29,22,.8);border:2px solid #5a4030;border-radius:6px;padding:10px 14px;max-height:240px;overflow-y:auto;"></div>
  </div>
  <div id="goDonate" style="width:100%;max-width:420px;margin-bottom:20px;">
   <div style="font-size:12px;letter-spacing:1px;color:#a08060;line-height:1.6;margin-bottom:10px;">
@@ -136,9 +136,22 @@ async function loadLeaderboard() {
     const res = await fetch(`${API}/api/leaderboard`);
     const rows = await res.json();
     const el = document.getElementById('goLbList');
-    el.innerHTML = rows.map((r, i) =>
-      `<span style="color:#c46a3a">${i + 1}.</span> ${r.name.toUpperCase().padEnd(16, ' ')} <b>${r.score}</b>`
-    ).join('<br>');
+    const myName = profile.name.toUpperCase();
+    let myRankIdx = -1;
+    el.innerHTML = rows.map((r, i) => {
+      const isMe = r.name.toUpperCase() === myName;
+      if (isMe) myRankIdx = i;
+      const hl = isMe ? 'color:#ffe08a;font-weight:bold;' : '';
+      const numColor = isMe ? '#ffe08a' : '#c46a3a';
+      return `<span style="${hl}"><span style="color:${numColor}">${i + 1}.</span> ${r.name.toUpperCase().padEnd(16, ' ')} <b>${r.score}</b></span>`;
+    }).join('<br>');
+    const rankEl = document.getElementById('goLbYourRank');
+    if (myRankIdx >= 0) {
+      rankEl.textContent = `— YOU #${myRankIdx + 1}`;
+      setTimeout(() => { el.querySelectorAll('span')[myRankIdx]?.scrollIntoView({ block: 'center' }); }, 50);
+    } else {
+      rankEl.textContent = '';
+    }
     document.getElementById('goLeaderboard').style.display = 'block';
   } catch (_) {}
 }

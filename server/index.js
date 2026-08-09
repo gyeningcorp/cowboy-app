@@ -39,7 +39,7 @@ app.post('/api/scores', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT name, MAX(score) AS score FROM scores GROUP BY name ORDER BY score DESC LIMIT 10'
+    'SELECT name, MAX(score) AS score FROM scores GROUP BY name ORDER BY score DESC LIMIT 500'
   );
   res.json(rows);
 });
