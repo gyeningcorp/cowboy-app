@@ -21,14 +21,16 @@ targets:
     type: application
     platform: iOS
     sources:
+      # Folder scan auto-classifies files: .swift -> Sources, game.html &
+      # Assets.xcassets -> Resources (Copy Bundle Resources). Do NOT use a
+      # top-level `resources:` key — XcodeGen ignores it, which previously
+      # dropped game.html from the bundle. Do NOT exclude game.html here.
       - path: Cowboy
         excludes:
-          - "game.html"
-    resources:
-      - path: Cowboy/game.html
-      - path: Cowboy/Assets.xcassets
-    info:
-      path: Cowboy/Info.plist
+          - "Info.plist"
+    # No `info:` key: that makes XcodeGen GENERATE (overwrite) Info.plist,
+    # stripping the real one (display name, encryption flag, orientation lock,
+    # hidden status bar). We ship the committed Info.plist via INFOPLIST_FILE.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.innercircle.cowboy
