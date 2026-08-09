@@ -99,13 +99,27 @@
   <div style="font-size:11px;letter-spacing:3px;color:#c46a3a;margin-bottom:8px;">🏆 TOP RIDERS</div>
   <div id="goLbList" style="font-size:13px;line-height:1.9;color:#f3e3c3;background:rgba(43,29,22,.8);border:2px solid #5a4030;border-radius:6px;padding:10px 14px;"></div>
  </div>
+ <div id="goDonate" style="width:100%;max-width:420px;margin-bottom:20px;">
+  <div style="font-size:12px;letter-spacing:1px;color:#a08060;line-height:1.6;margin-bottom:10px;">
+   Enjoyin' the trail? Toss a coin to keep the herd movin'.
+  </div>
+  <button id="donateBtn" style="font-family:inherit;font-size:15px;font-weight:bold;letter-spacing:2px;
+   padding:12px 28px;background:#8a9a5b;color:#fff;border:3px solid #f3e3c3;border-radius:6px;
+   box-shadow:0 4px 0 #2b1d16;cursor:pointer;">❤️ SUPPORT THE TRAIL</button>
+ </div>
  <button id="retryBtn">RIDE AGAIN</button>
+ <button id="homeBtn" style="margin-top:14px;font-size:15px;padding:12px 28px;background:transparent;
+  border:3px solid #5a4030;box-shadow:0 4px 0 #2b1d16;">◀ HOME</button>
 </div>
 
 <script>
 "use strict";
 // ============================== LEADERBOARD ==============================
 const API = 'https://cows-and-boys-server-production.up.railway.app';
+
+// ============================== DONATE ==============================
+// TODO: replace with the real donation link (Stripe / Ko-fi / PayPal.me / Cash App).
+const DONATE_URL = '';
 
 async function submitScore(name, score, trailTime, cowsLost, wolvesRepelled) {
   try {
@@ -723,6 +737,15 @@ function endGame() {
 
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('donateBtn').addEventListener('click', () => {
+  if (DONATE_URL) window.open(DONATE_URL, '_blank');
+  else toast('DONATE LINK COMING SOON');
+});
+document.getElementById('homeBtn').addEventListener('click', () => {
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  updateProfileUI();
+});
 
 initProfile();
 </script>
