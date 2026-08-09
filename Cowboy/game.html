@@ -19,6 +19,11 @@
  color:#fff; font-family:inherit; font-weight:bold; font-size:13px; letter-spacing:1px; display:none;
  box-shadow:0 3px 0 #2b1d16; }
  #lassoBtn:active { transform:translateY(2px); box-shadow:none; }
+ #exitBtn { position:fixed; bottom:calc(28px + env(safe-area-inset-bottom,0)); left:20px; z-index:6;
+ padding:10px 16px; border-radius:6px; border:3px solid #f3e3c3; background:rgba(43,29,22,.85);
+ color:#f3e3c3; font-family:inherit; font-weight:bold; font-size:13px; letter-spacing:1px; display:none;
+ box-shadow:0 3px 0 #2b1d16; }
+ #exitBtn:active { transform:translateY(2px); box-shadow:none; }
  .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
  justify-content:center; text-align:center; color:#f3e3c3; background:rgba(26,18,16,.88); padding:24px; }
  .overlay h1 { font-size:clamp(44px,12vw,84px); letter-spacing:6px; color:#e8c98f;
@@ -69,6 +74,7 @@
  <span class="pill" id="hudFx"></span>
 </div>
 <button id="lassoBtn">LASSO</button>
+<button id="exitBtn">✕ EXIT</button>
 <div id="toast"></div>
 
 <div class="overlay" id="menu">
@@ -705,6 +711,7 @@ function startGame() {
  for (let i = 0; i < profile.startingCows; i++)
  S.cows.push(makeCow(W/2 + rand(-70, 70), -H * .5 + rand(-50, 50)));
  updateLassoBtn();
+ document.getElementById('exitBtn').style.display = 'block';
  document.getElementById('menu').classList.add('hidden');
  document.getElementById('gameover').classList.add('hidden');
  last = performance.now();
@@ -742,6 +749,7 @@ function endGame() {
 
  document.getElementById('gameover').classList.remove('hidden');
  document.getElementById('goLeaderboard').style.display = 'none';
+ document.getElementById('exitBtn').style.display = 'none';
  lassoBtn.style.display = 'none';
  updateProfileUI();
  if (profile.name) submitScore(profile.name, runScore, Math.floor(S.t), S.cowsLost, S.wolvesRepelled);
@@ -755,6 +763,16 @@ document.getElementById('donateBtn').addEventListener('click', () => {
   else toast('DONATE LINK COMING SOON');
 });
 document.getElementById('homeBtn').addEventListener('click', () => {
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  updateProfileUI();
+});
+document.getElementById('exitBtn').addEventListener('click', () => {
+  if (!S.running) return;
+  if (!confirm("Quit this ride and head home? This run won't be scored.")) return;
+  S.running = false;
+  document.getElementById('exitBtn').style.display = 'none';
+  lassoBtn.style.display = 'none';
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('menu').classList.remove('hidden');
   updateProfileUI();
