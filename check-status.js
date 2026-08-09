@@ -43,10 +43,23 @@ async function main() {
   }
 
   const buildsR = await api(`/v1/builds?filter[app]=${APP_ID}&sort=-uploadedDate&limit=5&fields[builds]=version,uploadedDate,processingState`);
+  const builds = buildsR.body.data || [];
   console.log('\n--- Recent Builds ---');
-  for (const b of (buildsR.body.data || [])) {
+  for (const b of builds) {
     const a = b.attributes;
     console.log(`  build ${a.version} | ${a.processingState} | uploaded: ${a.uploadedDate}`);
+  }
+
+  console.log('\n--- Beta Review (TestFlight external) ---');
+  const latest = builds[0];
+  if (latest) {
+    const bd = await api(`/v1/builds/${latest.id}/buildBetaDetail`);
+    const ext = bd.body?.data?.attributes?.externalBuildState ?? 'n/a';
+    const bar = await api(`/v1/builds/${latest.id}/betaAppReviewSubmission`);
+    const barState = bar.body?.data?.attributes?.betaReviewState ?? 'n/a';
+    console.log(`  build ${latest.attributes.version} | betaReview: ${barState} | externalState: ${ext}`);
+  } else {
+    console.log('  no builds found');
   }
 
   const subR = await api(`/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=IOS&limit=5`);
