@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import UIKit
 
 struct GameView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -11,6 +12,7 @@ struct GameView: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         // isOpaque=true forces a WHITE paint until the page renders and ignores
@@ -32,7 +34,49 @@ struct GameView: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        // WKWebView ignores JS alert()/confirm()/prompt() unless the app implements
+        // these. Without them the in-game EXIT confirm() silently returned false and
+        // the button did nothing.
+        private func topController(_ webView: WKWebView) -> UIViewController? {
+            var responder: UIResponder? = webView
+            while let r = responder {
+                if let vc = r as? UIViewController { return vc }
+                responder = r.next
+            }
+            let scene = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive }
+            return scene?.keyWindow?.rootViewController
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+            topController(webView)?.present(alert, animated: true) ?? completionHandler()
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+            if let vc = topController(webView) { vc.present(alert, animated: true) } else { completionHandler(false) }
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                     defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                     completionHandler: @escaping (String?) -> Void) {
+            let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+            alert.addTextField { $0.text = defaultText }
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(nil) })
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                completionHandler(alert.textFields?.first?.text)
+            })
+            if let vc = topController(webView) { vc.present(alert, animated: true) } else { completionHandler(nil) }
+        }
+
         static func errorPage(_ msg: String) -> String {
             """
             <html><body style="background:#1a1210;color:#e8c98f;font-family:-apple-system,monospace;\
