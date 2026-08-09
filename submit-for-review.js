@@ -10,6 +10,7 @@ const APP_ID     = '6789995023';
 const BUILD_NUM  = process.env.GITHUB_RUN_NUMBER;
 const NEW_VERSION = '1.0.1';
 const PUBLIC_BETA_GROUP_ID = 'ba702019-ed93-4ffe-aab3-9bf07da265a1';
+const INTERNAL_GROUP_ID = '69edc09a-d6a2-4b6a-8eb7-c40fefd292ab';
 
 function makeJWT() {
   const privKey = fs.readFileSync(KEY_PATH, 'utf8');
@@ -61,18 +62,9 @@ async function main() {
   if (!build) throw new Error('Build not processed within 10 minutes');
   console.log(`✅ Build ${BUILD_NUM} ready: ${build.id}`);
 
-  // 1.5. Add to TestFlight Public Beta group (triggers beta review, auto-distributes to testers)
-  console.log('📱 Adding build to TestFlight Public Beta group...');
-  const tfR = await api('POST', `/v1/betaGroups/${PUBLIC_BETA_GROUP_ID}/relationships/builds`, {
-    data: [{ type: 'builds', id: build.id }]
-  });
-  if (tfR.status === 204 || tfR.status === 200) {
-    console.log('✅ Build added to TestFlight Public Beta group.');
-  } else {
-    console.log(`⚠️  TestFlight add status ${tfR.status}:`, JSON.stringify(tfR.body?.errors?.[0]?.detail ?? tfR.body));
-  }
-
-  // Set export compliance on the build
+  // 1.5. Set export compliance FIRST — a build cannot be assigned to any beta group
+  //      until encryption compliance is declared (otherwise the group-add returns
+  //      422 "Build is not in an externally assignable state").
   console.log('🔒 Setting export compliance (usesNonExemptEncryption=false)...');
   const compR = await api('PATCH', `/v1/builds/${build.id}`, {
     data: { type:'builds', id:build.id, attributes:{ usesNonExemptEncryption:false } }
@@ -81,6 +73,39 @@ async function main() {
     console.log('✅ Export compliance set.');
   } else {
     console.log('⚠️  Could not set export compliance:', JSON.stringify(compR.body));
+  }
+  await sleep(3000);
+
+  // 1.6. Add to TestFlight groups (compliance is now set, so the build is assignable).
+  //      Internal group = instant, no review. Public Beta = external, needs beta review.
+  //      Retry each add a few times since compliance can take a moment to propagate.
+  async function addToGroup(name, groupId) {
+    for (let i = 0; i < 4; i++) {
+      const r = await api('POST', `/v1/betaGroups/${groupId}/relationships/builds`, {
+        data: [{ type: 'builds', id: build.id }]
+      });
+      if (r.status === 204 || r.status === 200) { console.log(`✅ Build added to ${name}.`); return; }
+      console.log(`  ${name} add status ${r.status}: ${JSON.stringify(r.body?.errors?.[0]?.detail ?? r.body)} — retry ${i+1}/4`);
+      await sleep(15000);
+    }
+    console.log(`⚠️  Gave up adding build to ${name}.`);
+  }
+  console.log('📱 Adding build to TestFlight groups...');
+  await addToGroup('Internal Testers', INTERNAL_GROUP_ID);
+  await addToGroup('Public Beta', PUBLIC_BETA_GROUP_ID);
+
+  // 1.7. Submit for external beta app review so external testers actually receive the build.
+  //      Adding to an external group alone does NOT start review — this does.
+  console.log('🧪 Submitting build for beta app review...');
+  const betaR = await api('POST', '/v1/betaAppReviewSubmissions', {
+    data: { type:'betaAppReviewSubmissions', relationships:{ build:{ data:{ type:'builds', id:build.id } } } }
+  });
+  if (betaR.status < 400) {
+    console.log('✅ Beta review submitted. State:', betaR.body?.data?.attributes?.betaReviewState);
+  } else {
+    const detail = betaR.body?.errors?.[0]?.detail ?? '';
+    // A duplicate submission (already in/awaiting review) is not a failure.
+    console.log(`⚠️  Beta review submit status ${betaR.status}: ${detail || JSON.stringify(betaR.body)}`);
   }
   await sleep(2000);
 
