@@ -91,6 +91,18 @@
  Score = time survived × herd size. Lose every cow and it's over.
  </div>
  <button id="startBtn">RIDE OUT</button>
+ <button id="leaderboardBtn" style="margin-top:14px;font-size:15px;padding:12px 28px;background:transparent;
+  border:3px solid #5a4030;box-shadow:0 4px 0 #2b1d16;">🏆 LEADERBOARD</button>
+</div>
+
+<div class="overlay hidden" id="leaderboard">
+ <h1 style="font-size:clamp(32px,9vw,60px)">🏆 TOP<br>RIDERS</h1>
+ <div class="sub" id="lbYourRank"></div>
+ <div id="lbList" style="width:100%;max-width:420px;font-size:13px;line-height:1.9;color:#f3e3c3;
+  background:rgba(43,29,22,.8);border:2px solid #5a4030;border-radius:6px;padding:10px 14px;
+  max-height:55vh;overflow-y:auto;margin-bottom:20px;">Loadin' the trail...</div>
+ <button id="lbHomeBtn" style="font-size:15px;padding:12px 28px;background:transparent;
+  border:3px solid #5a4030;box-shadow:0 4px 0 #2b1d16;">◀ HOME</button>
 </div>
 
 <div class="overlay hidden" id="gameover">
@@ -137,29 +149,32 @@ async function submitScore(name, score, trailTime, cowsLost, wolvesRepelled) {
   } catch (_) {}
 }
 
-async function loadLeaderboard() {
+async function loadLeaderboard(listId = 'goLbList', rankId = 'goLbYourRank') {
   try {
     const res = await fetch(`${API}/api/leaderboard`);
     const rows = await res.json();
-    const el = document.getElementById('goLbList');
-    const myName = profile.name.toUpperCase();
+    const el = document.getElementById(listId);
+    const myName = (profile.name || '').toUpperCase();
     let myRankIdx = -1;
     el.innerHTML = rows.map((r, i) => {
-      const isMe = r.name.toUpperCase() === myName;
+      const isMe = myName && r.name.toUpperCase() === myName;
       if (isMe) myRankIdx = i;
       const hl = isMe ? 'color:#ffe08a;font-weight:bold;' : '';
       const numColor = isMe ? '#ffe08a' : '#c46a3a';
       return `<span style="${hl}"><span style="color:${numColor}">${i + 1}.</span> ${r.name.toUpperCase().padEnd(16, ' ')} <b>${r.score}</b></span>`;
     }).join('<br>');
-    const rankEl = document.getElementById('goLbYourRank');
+    const rankEl = document.getElementById(rankId);
     if (myRankIdx >= 0) {
       rankEl.textContent = `— YOU #${myRankIdx + 1}`;
       setTimeout(() => { el.querySelectorAll('span')[myRankIdx]?.scrollIntoView({ block: 'center' }); }, 50);
     } else {
       rankEl.textContent = '';
     }
-    document.getElementById('goLeaderboard').style.display = 'block';
-  } catch (_) {}
+    if (listId === 'goLbList') document.getElementById('goLeaderboard').style.display = 'block';
+  } catch (_) {
+    const el = document.getElementById(listId);
+    if (el && !el.querySelector('span')) el.textContent = "Couldn't reach the trail. Try again.";
+  }
 }
 
 // ============================== SETUP ==============================
@@ -771,6 +786,18 @@ function endGame() {
 
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('leaderboardBtn').addEventListener('click', () => {
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('leaderboard').classList.remove('hidden');
+  document.getElementById('lbList').innerHTML = "Loadin' the trail...";
+  document.getElementById('lbYourRank').textContent = '';
+  loadLeaderboard('lbList', 'lbYourRank');
+});
+document.getElementById('lbHomeBtn').addEventListener('click', () => {
+  document.getElementById('leaderboard').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  updateProfileUI();
+});
 document.getElementById('donateBtn').addEventListener('click', () => {
   if (DONATE_URL) window.open(DONATE_URL, '_blank');
   else toast('DONATE LINK COMING SOON');
