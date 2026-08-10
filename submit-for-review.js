@@ -128,7 +128,18 @@ async function main() {
 
   let version = versions.find(v => SUBMITTABLE.includes(v.attributes.appVersionState ?? v.attributes.appStoreState));
 
+  // A version already in Apple's review pipeline (or awaiting release) is a DONE state,
+  // not a failure: you cannot create or submit a new version while one is in flight, and
+  // TestFlight distribution above already succeeded. Skip App Store submission and exit green.
+  const IN_FLIGHT = ['WAITING_FOR_REVIEW','IN_REVIEW','PENDING_DEVELOPER_RELEASE',
+    'PENDING_APPLE_RELEASE','PROCESSING_FOR_DISTRIBUTION','READY_FOR_REVIEW'];
   if (!version) {
+    const inFlight = versions.find(v => IN_FLIGHT.includes(v.attributes.appVersionState ?? v.attributes.appStoreState));
+    if (inFlight) {
+      const st = inFlight.attributes.appVersionState ?? inFlight.attributes.appStoreState;
+      console.log(`ℹ️  App Store version ${inFlight.attributes.versionString} is already ${st} — nothing to submit. TestFlight build is live for testers. Done.`);
+      return;
+    }
     console.log(`📦 No submittable version — creating ${NEW_VERSION}...`);
     const createR = await api('POST', '/v1/appStoreVersions', {
       data: {
