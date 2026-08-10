@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const { Pool } = require('pg');
 
 const app = express();
@@ -45,6 +46,9 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 app.get('/health', (_, res) => res.json({ ok: true }));
+
+// Serve the game itself so it's playable in any browser via a single link.
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'game.html')));
 
 init().then(() => {
   const port = process.env.PORT || 3000;
