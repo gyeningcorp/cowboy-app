@@ -93,6 +93,9 @@
  <button id="startBtn">RIDE OUT</button>
  <button id="leaderboardBtn" style="margin-top:14px;font-size:15px;padding:12px 28px;background:transparent;
   border:3px solid #5a4030;box-shadow:0 4px 0 #2b1d16;">🏆 LEADERBOARD</button>
+ <button id="menuDonateBtn" style="margin-top:14px;font-family:inherit;font-size:15px;font-weight:bold;letter-spacing:2px;
+  padding:12px 28px;background:#8a9a5b;color:#fff;border:3px solid #f3e3c3;border-radius:6px;
+  box-shadow:0 4px 0 #2b1d16;cursor:pointer;">❤️ SUPPORT THE TRAIL</button>
 </div>
 
 <div class="overlay hidden" id="leaderboard">
@@ -136,8 +139,8 @@
 const API = 'https://cows-and-boys-server-production.up.railway.app';
 
 // ============================== DONATE ==============================
-// TODO: replace with the real donation link (Stripe / Ko-fi / PayPal.me / Cash App).
-const DONATE_URL = '';
+// GoFundMe for Cows and Boys — supports the trail.
+const DONATE_URL = 'https://gofund.me/66d319607';
 
 async function submitScore(name, score, trailTime, cowsLost, wolvesRepelled) {
   try {
@@ -798,10 +801,16 @@ document.getElementById('lbHomeBtn').addEventListener('click', () => {
   document.getElementById('menu').classList.remove('hidden');
   updateProfileUI();
 });
-document.getElementById('donateBtn').addEventListener('click', () => {
-  if (DONATE_URL) window.open(DONATE_URL, '_blank');
-  else toast('DONATE LINK COMING SOON');
-});
+function openDonate() {
+  if (!DONATE_URL) { toast('DONATE LINK COMING SOON'); return; }
+  // window.open('_blank') is silently blocked inside iOS WKWebView and some
+  // mobile popup blockers, so fall back to same-window navigation.
+  let win = null;
+  try { win = window.open(DONATE_URL, '_blank'); } catch (e) { win = null; }
+  if (!win) window.location.href = DONATE_URL;
+}
+document.getElementById('donateBtn').addEventListener('click', openDonate);
+document.getElementById('menuDonateBtn').addEventListener('click', openDonate);
 document.getElementById('homeBtn').addEventListener('click', () => {
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('menu').classList.remove('hidden');
