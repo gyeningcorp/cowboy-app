@@ -86,6 +86,30 @@ jobs:
             -exportPath $RUNNER_TEMP/export \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
 
+      - name: Verify signature chain
+        run: |
+          IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)
+          echo "Verifying: $IPA"
+          rm -rf "$RUNNER_TEMP/verify" && mkdir -p "$RUNNER_TEMP/verify"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/verify"
+          APP=$(find "$RUNNER_TEMP/verify/Payload" -maxdepth 1 -name "*.app" | head -1)
+          echo "App bundle: $APP"
+          INFO=$(codesign -dvvv "$APP" 2>&1)
+          echo "$INFO"
+          # A valid App Store distribution signature must chain through the
+          # Apple WWDR intermediate up to the Apple Root CA. If either authority
+          # is missing, the chain is incomplete and Apple returns ITMS-90035.
+          if ! echo "$INFO" | grep -qi "Authority=Apple Worldwide Developer Relations"; then
+            echo "::error::Signature missing Apple WWDR intermediate — would be rejected with ITMS-90035"
+            exit 1
+          fi
+          if ! echo "$INFO" | grep -qi "Authority=Apple Root CA"; then
+            echo "::error::Signature does not chain to Apple Root CA — would be rejected with ITMS-90035"
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "✅ Signature chain valid (WWDR intermediate + Apple Root CA present)"
+
       - name: Upload to App Store Connect
         run: |
           IPA=$(find "$RUNNER_TEMP/export" -name "*.ipa" | head -1)

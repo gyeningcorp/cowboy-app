@@ -136,6 +136,32 @@ async function main() {
   execSync(`security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k cowboy123 cowboy-build.keychain`);
   console.log('✅ Certificate installed in keychain');
 
+  // Install Apple WWDR intermediate certs. Without these, codesign embeds an
+  // incomplete chain and Apple rejects the upload with ITMS-90035 "invalid
+  // signature / not signed with a distribution certificate" even though every
+  // local step (archive/export/upload) reports success. Modern distribution
+  // certs chain through G3+, so install the current intermediates.
+  console.log('🔗 Installing Apple WWDR intermediate certificates...');
+  const wwdr = [
+    ['G3', 'https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer'],
+    ['G4', 'https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer'],
+    ['G5', 'https://www.apple.com/certificateauthority/AppleWWDRCAG5.cer'],
+    ['G6', 'https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer'],
+  ];
+  let wwdrInstalled = 0;
+  for (const [gen, url] of wwdr) {
+    const cerPath = path.join(TMP, `wwdr_${gen}.cer`);
+    try {
+      execSync(`curl -fsSL -o ${cerPath} "${url}"`, { stdio: 'inherit' });
+      execSync(`security import ${cerPath} -k cowboy-build.keychain -T /usr/bin/codesign`, { stdio: 'inherit' });
+      wwdrInstalled++;
+      console.log(`  ✅ WWDR ${gen} installed`);
+    } catch {
+      console.log(`  ⚠️  WWDR ${gen} skipped (download/import failed)`);
+    }
+  }
+  if (wwdrInstalled === 0) throw new Error('Failed to install any WWDR intermediate — signing chain would be invalid');
+
   const appBundleResId = await ensureBundleId(BUNDLE_ID, 'Cowboy');
 
   console.log('📋 Creating provisioning profile...');
