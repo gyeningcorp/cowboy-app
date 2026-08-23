@@ -25,7 +25,9 @@
  box-shadow:0 3px 0 #2b1d16; }
  #exitBtn:active { transform:translateY(2px); box-shadow:none; }
  .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
- justify-content:center; text-align:center; color:#f3e3c3; background:rgba(26,18,16,.88); padding:24px; }
+ justify-content:flex-start; text-align:center; color:#f3e3c3; background:rgba(26,18,16,.88); padding:24px;
+ overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+ .overlay::before, .overlay::after { content:''; flex:1; min-height:12px; }
  .overlay h1 { font-size:clamp(44px,12vw,84px); letter-spacing:6px; color:#e8c98f;
  text-shadow:4px 4px 0 #7a3b1e, 8px 8px 0 #2b1d16; margin-bottom:6px; }
  .overlay .sub { font-size:14px; letter-spacing:3px; color:#c46a3a; margin-bottom:26px; }
