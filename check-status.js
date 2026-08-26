@@ -70,4 +70,34 @@ async function main() {
   console.log('');
 }
 
-main().catch(e => { console.error('❌', e.message); process.exit(1); });
+// ---- RELEASE STEP: publish an approved (READY_FOR_DISTRIBUTION) version ----
+const RELEASABLE = ['READY_FOR_DISTRIBUTION','PENDING_DEVELOPER_RELEASE'];
+function apiRW(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const req = https.request({
+      hostname: 'api.appstoreconnect.apple.com', path, method,
+      headers: { Authorization: `Bearer ${makeJWT()}`, 'Content-Type': 'application/json',
+        ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) }
+    }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{resolve({status:res.statusCode,body:JSON.parse(d)});}catch{resolve({status:res.statusCode,body:d});} }); });
+    req.on('error', reject); if (data) req.write(data); req.end();
+  });
+}
+async function release() {
+  console.log('\n=== RELEASE STEP ===');
+  const vR = await apiRW('GET', `/v1/apps/${APP_ID}/appStoreVersions?filter[platform]=IOS&limit=5`);
+  const vs = vR.body.data || [];
+  const target = vs.find(v => RELEASABLE.includes(v.attributes.appVersionState ?? v.attributes.appStoreState));
+  if (!target) { console.log('⚠️  No releasable version. Skipping.'); return; }
+  const st = target.attributes.appVersionState ?? target.attributes.appStoreState;
+  console.log(`🎯 Releasing ${target.attributes.versionString} (${st})...`);
+  const rel = await apiRW('POST', '/v1/appStoreVersionReleaseRequests', {
+    data: { type:'appStoreVersionReleaseRequests', relationships:{ appStoreVersion:{ data:{ type:'appStoreVersions', id:target.id } } } }
+  });
+  if (rel.status < 400) { console.log(`✅ RELEASE REQUESTED — ${target.attributes.versionString} going live now.`); }
+  else { const d = rel.body?.errors?.[0]?.detail ?? JSON.stringify(rel.body);
+    if (/already|in progress/i.test(d)) console.log(`✅ Release already in progress: ${d}`);
+    else console.log(`❌ Release failed (${rel.status}): ${d}`); }
+}
+
+main().then(release).catch(e => { console.error('❌', e.message); process.exit(1); });
