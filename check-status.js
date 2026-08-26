@@ -85,6 +85,17 @@ function apiRW(method, path, body) {
 }
 async function release() {
   console.log('\n=== RELEASE STEP ===');
+  // 0. Cancel orphaned/dangling submissions that block release (409 state).
+  const exR = await apiRW('GET', `/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=IOS&limit=10`);
+  for (const s of (exR.body.data || [])) {
+    if (['WAITING_FOR_REVIEW','READY_FOR_REVIEW','DRAFT','UNRESOLVED_ISSUES'].includes(s.attributes.state)) {
+      const cr = await apiRW('PATCH', `/v1/reviewSubmissions/${s.id}`, {
+        data: { type:'reviewSubmissions', id:s.id, attributes:{ canceled:true } }
+      });
+      console.log(`  ${cr.status < 400 ? '✅ canceled' : '⚠️  failed'} submission ${s.id} (${s.attributes.state})`);
+    }
+  }
+  await new Promise(r => setTimeout(r, 4000));
   const vR = await apiRW('GET', `/v1/apps/${APP_ID}/appStoreVersions?filter[platform]=IOS&limit=5`);
   const vs = vR.body.data || [];
   const target = vs.find(v => RELEASABLE.includes(v.attributes.appVersionState ?? v.attributes.appStoreState));
