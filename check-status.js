@@ -89,13 +89,18 @@ async function release() {
   const exR = await apiRW('GET', `/v1/reviewSubmissions?filter[app]=${APP_ID}&filter[platform]=IOS&limit=10`);
   for (const s of (exR.body.data || [])) {
     if (['WAITING_FOR_REVIEW','READY_FOR_REVIEW','DRAFT','UNRESOLVED_ISSUES'].includes(s.attributes.state)) {
-      const cr = await apiRW('PATCH', `/v1/reviewSubmissions/${s.id}`, {
-        data: { type:'reviewSubmissions', id:s.id, attributes:{ canceled:true } }
-      });
-      console.log(`  ${cr.status < 400 ? '✅ canceled' : '⚠️  failed'} submission ${s.id} (${s.attributes.state})`);
+      // Try DELETE first (correct for un-submitted DRAFT/READY submissions)
+      let cr = await apiRW('DELETE', `/v1/reviewSubmissions/${s.id}`);
+      if (cr.status >= 400) {
+        // Fallback: PATCH canceled:true (for submitted-then-cancel case)
+        cr = await apiRW('PATCH', `/v1/reviewSubmissions/${s.id}`, {
+          data: { type:'reviewSubmissions', id:s.id, attributes:{ canceled:true } }
+        });
+      }
+      console.log(`  ${cr.status < 400 ? '✅ cleared' : '⚠️  failed('+cr.status+')'} submission ${s.id} (${s.attributes.state}) ${cr.status>=400 ? JSON.stringify(cr.body?.errors?.[0]?.detail ?? cr.body) : ''}`);
     }
   }
-  await new Promise(r => setTimeout(r, 4000));
+  await new Promise(r => setTimeout(r, 5000));
   const vR = await apiRW('GET', `/v1/apps/${APP_ID}/appStoreVersions?filter[platform]=IOS&limit=5`);
   const vs = vR.body.data || [];
   const target = vs.find(v => RELEASABLE.includes(v.attributes.appVersionState ?? v.attributes.appStoreState));
