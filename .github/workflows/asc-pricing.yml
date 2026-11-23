@@ -1,0 +1,27 @@
+name: ASC Pricing
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: inspect or apply
+        default: inspect
+jobs:
+  pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write ASC API Key
+        run: |
+          mkdir -p ~/.private_keys
+          printf '%s' "$ASC_PRIVATE_KEY" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          chmod 600 ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      - name: Pricing
+        run: node asc-pricing.js
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: /home/runner/.private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
